@@ -1,4 +1,4 @@
-[hosts]
+[k8s]
 %{for ip in ips ~}
 ${ip}
 %{endfor ~}
@@ -7,12 +7,4 @@ ${ip}
 
 [all:vars]
 ansible_connection=ssh
-ansible_user=root
-
-
-
-
-
-[all:vars]
-ansible_connection=ssh
-ansible_user=root
+ansible_user=ec2-user

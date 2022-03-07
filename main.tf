@@ -84,7 +84,23 @@ resource "aws_security_group" "ssh-allowed" {
     to_port          = 22
     protocol         = "tcp"
   }
-
+  
+  
+  ingress {
+    cidr_blocks = ["0.0.0.0/0"]
+    description      = "icmp"
+    from_port        = -1
+    to_port          = -1
+    protocol         = "icmp"
+  }
+  
+  ingress {
+    cidr_blocks = [aws_vpc.myvpc.cidr_block]
+    description      = "all inside subnet"
+    from_port        = 0
+    to_port          = 0
+    protocol         = "-1"
+  }
   egress {
     from_port        = 0
     to_port          = 0
@@ -110,11 +126,42 @@ resource "aws_instance" "kub" {
   subnet_id = aws_subnet.myvpc-sub1.id
   vpc_security_group_ids = [aws_security_group.ssh-allowed.id]
   key_name = aws_key_pair.root.id
+  tags = {
+    Name = "node${count.index}"
+  }
+  
+  connection {
+    type     = "ssh"
+    user     = "ec2-user"
+    private_key = file("${path.module}/id_rsa_private")
+    host     = self.public_ip
+  }
+  
+  provisioner "remote-exec" {
+    inline = [
+      "echo '127.0.0.1 ${self.tags.Name}' | sudo tee -a /etc/hosts",
+      "sudo hostnamectl set-hostname ${self.tags.Name}",
+    ]
+  }
+  root_block_device {
+        delete_on_termination = true
+        volume_size           = 10
+        volume_type           = "gp3"
+    }
+  
 }
 
 
 
+output "instance_id" {
+  description = "ID of the EC2 instance"
+  value       = aws_instance.kub[*].id
+}
 
+output "instance_private_ip" {
+  description = "Public IP address of the EC2 instance"
+  value       = aws_instance.kub[*].private_ip
+}
 
 output "instance_public_ip" {
   description = "Public IP address of the EC2 instance"
@@ -122,30 +169,16 @@ output "instance_public_ip" {
 }
 
 
-#
-#
-#
+
 #### Rendering inventory	
-#resource "local_file" "inventory" {
-#  content = templatefile("${path.module}/inventory.tmpl",
-#    {
-#      ips = aws_route53_record.mezswarm[*].name
-#    }
-#  )
-#  filename = "${path.module}/inventory.ini"
-#}
-#
-#
-#output "server_ip_testmez" {
-#  value = digitalocean_droplet.swarm[*].ipv4_address
-#}
-#
-#
-#
-#output "record" {
-#  value = aws_route53_record.mezswarm[*].fqdn
-#}
-#
-#
+resource "local_file" "inventory" {
+  content = templatefile("${path.module}/inventory.tmpl",
+    {
+      ips = aws_instance.kub[*].public_ip
+    }
+  )
+  filename = "${path.module}/inventory.ini"
+}
+
 
 
