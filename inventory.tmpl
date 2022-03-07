@@ -1,0 +1,18 @@
+[hosts]
+%{for ip in ips ~}
+${ip}
+%{endfor ~}
+
+
+
+[all:vars]
+ansible_connection=ssh
+ansible_user=root
+
+
+
+
+
+[all:vars]
+ansible_connection=ssh
+ansible_user=root
