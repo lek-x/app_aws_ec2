@@ -1,7 +1,3 @@
-variable "countvm" {
-  type    = number
-  default = 3
-}
 variable "accesskey" {}
 variable "secretkey" {}
 variable "region" {
