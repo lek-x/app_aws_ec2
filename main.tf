@@ -124,7 +124,7 @@ resource "aws_security_group" "k8g" {
 resource "aws_instance" "kub" {
   count                       = var.countvm
   ami                         = "ami-0d527b8c289b4af7f"
-  instance_type               = "t2.micro"
+  instance_type               = "t2.small"
   subnet_id                   = aws_subnet.myvpc-sub1.id
   #associate_public_ip_address = true
   vpc_security_group_ids      = [aws_security_group.k8g.id]
@@ -146,7 +146,7 @@ resource "aws_instance" "kub" {
       "sudo hostnamectl set-hostname ${self.tags.Name}",
       "sudo sed -i 's/#PermitRootLogin no/PermitRootLogin yes/' /etc/ssh/sshd_config",
       "sudo rm -rf /root/.ssh/authorized-keys",
-      "sudo cp /home/ec2-user/.ssh/authorized_keys /root/.ssh/",
+      "sudo cp /home/ubuntu/.ssh/authorized_keys /root/.ssh/",
       "sudo chown root:root /root/.ssh/authorized_keys && sudo chmod 600 /root/.ssh/authorized_keys",
       "sudo service sshd restart"
     ]
