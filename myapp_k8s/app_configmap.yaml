@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: app-config
+  labels:
+    app: myapp
+data:
+  dname: "postgres"
+  duser: "postgres"
+  dbhost: "postgres"
+  prt: "5432"

@@ -1,0 +1,32 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+    labels:
+        app: myapp
+    name: myapp
+spec:
+    replicas: 1
+    selector:
+        matchLabels:
+            app: myapp
+    template:
+        metadata:
+            labels:
+                app: myapp
+        spec:
+            containers:
+              - image: ghcr.io/lek-x/app:1.0-b
+                imagePullPolicy: IfNotPresent
+                name: myapp
+                envFrom:
+                  - secretRef:
+                      name: app-secret
+                  - configMapRef:
+                      name: app-config
+                ports:
+                  - containerPort: 5000
+                    name: myapp
+            imagePullSecrets:
+              - name: githreg  
+                             
+                    
