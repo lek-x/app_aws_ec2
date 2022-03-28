@@ -1,5 +1,6 @@
 #!/bin/bash
 
+unset $IPS
 tr -d '\r' < inventory.ini > inventory2.ini
 declare -a IPS2=()
 n=0

@@ -19,10 +19,10 @@ resource "aws_vpc" "myvpc" {
   cidr_block           = "10.240.0.0/16"
   instance_tenancy     = "default"
   enable_dns_hostnames = "true"
-  enable_dns_support   = true
+  enable_dns_support   = "true"
 
   tags = {
-    Name = "myvpc_test"
+    Name = "vpc_${var.cluster_name}"
   }
 }
 
@@ -35,12 +35,28 @@ resource "aws_subnet" "myvpc-sub1" {
   availability_zone       = "eu-central-1a"
 
   tags = {
-    Name = "myvpc-sub1_public_new"
+    "kubernetes.io/cluster/${var.cluster_name}" = "1",
+	"kubernetes.io/role/elb" = "1"
   }
 }
 
+##Create Private subnet in VPC
+#resource "aws_subnet" "myvpc-sub2" {
+#  vpc_id                  = aws_vpc.myvpc.id
+#  cidr_block              = "10.240.2.0/24"
+#  availability_zone       = "eu-central-1a"
+#
+#  tags = {
+#    "kubernetes.io/cluster/${var.cluster_name}" = "1",
+#	
+#  }
+#}
+#
 
-### Create gw for VPC
+
+
+
+### Create Internet Gateway for VPC
 resource "aws_internet_gateway" "gw" {
   vpc_id = aws_vpc.myvpc.id
 
@@ -59,8 +75,23 @@ resource "aws_route_table" "main" {
     gateway_id = aws_internet_gateway.gw.id
   }
   tags = {
-  Name = "public-crt" }
+  "kubernetes.io/cluster/${var.cluster_name}" = "1",
+  "kubernetes.io/role/elb" = "1"
+  }
 }
+
+
+##Create Private route table
+#resource "aws_route_table" "private" {
+#  vpc_id = aws_vpc.myvpc.id
+#
+#  route {
+#    cidr_block = "10.240.2.0/24"
+#  }
+#  tags = {
+#  "kubernetes.io/cluster/${var.cluster_name}" = "1"
+#  }
+#}
 
 resource "aws_route_table_association" "myvpc-sub1-crt-main" {
   subnet_id      = aws_subnet.myvpc-sub1.id
@@ -72,31 +103,31 @@ resource "aws_security_group" "k8g" {
   description = "rules for k8s"
   vpc_id      = aws_vpc.myvpc.id
 
-#  ingress {
-#    cidr_blocks = ["0.0.0.0/0"]
-#    description = "allow ssh"
-#    from_port   = 22
-#    to_port     = 22
-#    protocol    = "tcp"
-#  }
-  
-#  ingress {
-#    cidr_blocks = ["0.0.0.0/0"]
-#    description = "kub"
-#    from_port   = 6443
-#    to_port     = 6443
-#    protocol    = "tcp"
-#  }
+  ingress {
+    cidr_blocks = ["0.0.0.0/0"]
+    description = "allow ssh"
+    from_port   = 22
+    to_port     = 22
+    protocol    = "tcp"
+  }
+ 
+  ingress {
+    cidr_blocks = ["0.0.0.0/0"]
+    description = "kub"
+    from_port   = 6443
+    to_port     = 6443
+    protocol    = "tcp"
+  }
 
 
-#  ingress {
-#    cidr_blocks = ["0.0.0.0/0"]
-#    description = "icmp"
-#    from_port   = -1
-#    to_port     = -1
-#    protocol    = "icmp"
-#  }
-#
+  ingress {
+    cidr_blocks = ["0.0.0.0/0"]
+    description = "icmp"
+    from_port   = -1
+    to_port     = -1
+    protocol    = "icmp"
+  }
+
   ingress {
     #cidr_blocks = [aws_vpc.myvpc.cidr_block]
     cidr_blocks = ["0.0.0.0/0"]
@@ -118,6 +149,23 @@ resource "aws_security_group" "k8g" {
   }
 }
 
+resource "aws_eip" "eip_res" {
+  count = var.countvm
+  instance = "${element(aws_instance.kub[*].id, count.index)}"
+  vpc = true
+  tags = {
+    Name = "eip_res${count.index}"
+  }
+}
+
+
+#resource "aws_eip_association" "eip_assoc" {
+#  instance_id   = "${element(aws_instance.kub[*].id, count.index)}"
+#  allocation_id = "${element(aws_eip.eip_res[*].id,count.index)}"
+#
+#}
+
+
 
 
 ### Create new VMs EC2 for kubernets
@@ -130,7 +178,8 @@ resource "aws_instance" "kub" {
   vpc_security_group_ids      = [aws_security_group.k8g.id]
   key_name                    = aws_key_pair.root.id
   tags = {
-    Name = "node${count.index}"
+    "kubernetes.io/cluster/${var.cluster_name}" = "1",
+	 Name = "node${count.index}"
   }
 
   connection {
@@ -170,7 +219,7 @@ output "instance_id" {
 
 ###Show EC2_priv_ip
 output "instance_private_ip" {
-  description = "Public IP address of the EC2 instance"
+  description = "Private IP address of the EC2 instance"
   value       = aws_instance.kub[*].private_ip
 }
 
@@ -181,8 +230,14 @@ output "instance_public_ip" {
 }
 
 
+###Show EC2_hostname
+output "instance_hostname" {
+  description = "DNS address of the EC2 instance"
+  value       = aws_instance.kub[*].private_dns
+}
 
-#### Rendering inventory
+
+#### Rendering inventory (pub IP)
 resource "local_file" "inventory" {
   content = templatefile("${path.module}/inventory.tmpl",
     {
@@ -191,6 +246,18 @@ resource "local_file" "inventory" {
   )
   filename = "${path.module}/inventory.ini"
 }
+
+
+#### Rendering inventory internal DNS
+resource "local_file" "inventory_dns" {
+  content = templatefile("${path.module}/inventory_dns.tmpl",
+    {
+      dns = aws_instance.kub[*].private_dns
+    }
+  )
+  filename = "${path.module}/inventory.dns"
+}
+
 
 ###Wait some time
 resource "time_sleep" "wait" {
