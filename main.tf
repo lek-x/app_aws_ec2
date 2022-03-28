@@ -248,15 +248,13 @@ resource "local_file" "inventory" {
 }
 
 
-#### Rendering inventory internal DNS
+##### Rendering inventory internal DNS
 resource "local_file" "inventory_dns" {
-  content = templatefile("${path.module}/inventory_dns.tmpl",
-    {
-      dns = aws_instance.kub[*].private_dns
-    }
-  )
+  content = templatefile("${path.module}/inventory_dns.tmpl",{dns = aws_instance.kub[*].private_dns,ips = aws_instance.kub[*].public_ip})
   filename = "${path.module}/inventory.dns"
 }
+
+
 
 
 ###Wait some time

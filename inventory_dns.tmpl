@@ -1,6 +1,6 @@
 [k8s]
-%{for i in dns ~}
-${i}
+%{for index, ip in ips ~}
+${dns[index]} ${ip} 
 %{endfor ~}
 
 
